@@ -1,5 +1,4 @@
 # WSE_project
-
 # Technical Project Summary: Oscar Bait Prediction Pipeline
 
 This project builds a machine learning pipeline to predict Academy Award nominations using structured metadata from Wikidata. The study analyzes global films released over a 15-year window (2011–2026). Instead of using text-based critical reviews, the model relies entirely on factual graph features to identify patterns behind "Oscar bait" (RQ1) and measure data gaps in the knowledge graph (RQ2).
@@ -25,6 +24,8 @@ By sub-dividing the workload into 12 monthly chunks, the query size dropped sign
 Instead of guessing which features matter, we designed a pipeline for **Dynamic Feature Discovery** to harvest every single piece of data available for these 75,000 films.
 
 ### Data Flow Architecture
+
+[Master Q-ID List] ➔ [Batching (50 IDs)] ➔ [Wikidata API Call] ➔ [Data Type Parser] ➔ [Checkpoint Verification] ➔ [Append to JSONL]
 
 ```markdown
 # Technical Project Summary: Oscar Bait Prediction Pipeline
