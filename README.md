@@ -1,9 +1,76 @@
 # WSE_project
 
-Our research project, which aims to evaluate and predict Academy Award nominations using structured metadata from the Wikidata knowledge graph. The study limits its scope to global motion pictures released over a fifteen-year period, specifically from 2011 through 2026. By focusing exclusively on factual relationships and categorical attributes rather than critical reviews, the project seeks to discover mathematical patterns behind what popular culture defines as Oscar bait, while also evaluating data coverage and quality within open-source knowledge bases.
+# Technical Project Summary: Oscar Bait Prediction Pipeline
 
-The first major milestone involved identifying and collecting the unique identification keys for every film in the target timeframe. To achieve this, we interacted with the public Wikidata query service. During the initial global extraction, the pipeline encountered common web data engineering challenges, including server timeouts and request throttling due to the massive volume of records. To resolve these interruptions and guarantee absolute completeness, we developed a secondary data patch pipeline. This system isolated the missing years and requested the data in smaller, monthly increments, which significantly reduced the processing load on the remote servers. The resulting identifiers were combined and mathematically deduplicated, creating a clean baseline dataset of approximately 75,000 unique films.
+This project builds a machine learning pipeline to predict Academy Award nominations using structured metadata from Wikidata. The study analyzes global films released over a 15-year window (2011–2026). Instead of using text-based critical reviews, the model relies entirely on factual graph features to identify patterns behind "Oscar bait" (RQ1) and measure data gaps in the knowledge graph (RQ2).
 
-With the complete list of film identifiers secured, we initiated the second phase of the project, which focuses on dynamic attribute harvesting. Rather than restricting our study to a few predetermined variables like genre or runtime, we designed a pipeline capable of discovering every single property recorded for each movie. This approach allows the data itself to reveal hidden signals without human bias. Because downloading detailed graph data for thousands of entities requires significant time and network stability, the extraction software was built with professional data management practices. The system saves the information sequentially, line by line, and utilizes an automated checkpoint mechanism. If a network interruption occurs, the program can read the existing output and resume processing exactly where it stopped, protecting the integrity of the data and preventing duplicate server requests.
+The data engineering workflow is divided into three concrete phases.
 
-Once this ongoing collection phase concludes, the harvested metadata will be compiled into a unified table. The next step will involve translating the abstract property codes into human-readable definitions and preparing the dataset for feature selection algorithms. This structured dataset will ultimately allow us to evaluate how missing information impacts lesser-known films and determine the true predictive power of pure metadata in cultural analytics.
+---
+
+## Phase 1: Film ID Collection & Error Mitigation
+
+The first step was building a baseline dataset of all relevant film entities. We queried the Wikidata SPARQL endpoint to find items matching specific semantic criteria:
+
+* **Target Criteria:** Items must be an instance of a film (`wdt:P31 wd:Q11424`) and possess a valid publication date (`wdt:P577`).
+* **Pipeline Challenges:** Requesting an entire year of global cinema caused severe server strain, resulting in HTTP 429 (Rate Limit Hit) and HTTP 502 (Bad Gateway) timeouts.
+* **The Solution:** We deployed a Python patch script that isolated the broken years (2013 and 2018) and queried them in smaller, monthly increments.
+
+By sub-dividing the workload into 12 monthly chunks, the query size dropped significantly, bypassing server timeouts. The script combined, deduplicated, and validated the records, saving a finalized list of approximately 75,000 unique film Q-IDs into `movie_ids_2011_2026.json`.
+
+---
+
+## Phase 2: Dynamic Feature Harvesting
+
+Instead of guessing which features matter, we designed a pipeline for **Dynamic Feature Discovery** to harvest every single piece of data available for these 75,000 films.
+
+### Data Flow Architecture
+
+```markdown
+# Technical Project Summary: Oscar Bait Prediction Pipeline
+
+This project builds a machine learning pipeline to predict Academy Award nominations using structured metadata from Wikidata. The study analyzes global films released over a 15-year window (2011–2026). Instead of using text-based critical reviews, the model relies entirely on factual graph features to identify patterns behind "Oscar bait" (RQ1) and measure data gaps in the knowledge graph (RQ2).
+
+The data engineering workflow is divided into three concrete phases.
+
+---
+
+## Phase 1: Film ID Collection & Error Mitigation
+
+The first step was building a baseline dataset of all relevant film entities. We queried the Wikidata SPARQL endpoint to find items matching specific semantic criteria:
+
+* **Target Criteria:** Items must be an instance of a film (`wdt:P31 wd:Q11424`) and possess a valid publication date (`wdt:P577`).
+* **Pipeline Challenges:** Requesting an entire year of global cinema caused severe server strain, resulting in HTTP 429 (Rate Limit Hit) and HTTP 502 (Bad Gateway) timeouts.
+* **The Solution:** We deployed a Python patch script that isolated the broken years (2013 and 2018) and queried them in smaller, monthly increments.
+
+By sub-dividing the workload into 12 monthly chunks, the query size dropped significantly, bypassing server timeouts. The script combined, deduplicated, and validated the records, saving a finalized list of approximately 75,000 unique film Q-IDs into `movie_ids_2011_2026.json`.
+
+---
+
+## Phase 2: Dynamic Feature Harvesting
+
+Instead of guessing which features matter, we designed a pipeline for **Dynamic Feature Discovery** to harvest every single piece of data available for these 75,000 films.
+
+### Data Flow Architecture
+
+```
+
+[Master Q-ID List] ➔ [Batching (50 IDs)] ➔ [Wikidata API Call] ➔ [Data Type Parser] ➔ [Checkpoint Verification] ➔ [Append to JSONL]
+
+```
+
+* **API Protocol:** The script sends requests to the Wikidata Action API using the `wbgetentities` endpoint, processing films in optimal chunks of 50 items.
+* **Data Extraction:** The code extracts the entire `claims` dictionary. It automatically loops through every property ID (`P-number`) present on an entity page, parsing four data types: `wikibase-entityid` (categorical links), `quantity` (numeric values like budget), `time` (dates), and standard strings.
+* **Fault Tolerance:** To protect against network drops during the 20-to-30-minute extraction process, the script writes data sequentially to a JSON Lines file (`raw_movie_features.jsonl`). A built-in checkpoint system reads the file upon startup, logs already completed Q-IDs, and automatically resumes processing remaining items without duplicating API calls.
+
+---
+
+## Phase 3: Matrix Structuring & Downstream Analytics
+
+Once the raw extraction completes, the pipeline shifts from collection to preparation:
+
+* **Data Flattening:** The `.jsonl` file will be loaded into a `pandas` DataFrame where rows represent individual films and columns represent the discovered `P-numbers`.
+* **Label Mapping:** A utility SPARQL query will translate abstract columns (e.g., mapping `P1040` to "Film Editor" and `P2515` to "Costume Designer") to make the dataset human-readable.
+* **Analysis:** Missing data points will remain as `None` values. We will calculate the missingness percentage across nominated versus non-nominated films to statistically track knowledge graph bias (RQ2). Finally, this matrix will be fed into a tree-based classifier (like Random Forest or XGBoost) to calculate feature importance scores and isolate the true structural signals of an Oscar contender (RQ1/RQ3).
+
+```
