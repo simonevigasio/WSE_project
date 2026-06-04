@@ -1,18 +1,24 @@
-# WSE_project
-# Technical Project Summary: Oscar Bait Prediction Pipeline
+# Oscar Bait Prediction Pipeline
 
-This project builds a machine learning pipeline to predict Academy Award nominations using structured metadata from Wikidata. The study analyzes global films released over a 15-year window (2011–2026). Instead of using text-based critical reviews, the model relies entirely on factual graph features to identify patterns behind "Oscar bait" (RQ1) and measure data gaps in the knowledge graph (RQ2).
+This project contains a clean, 5-step pipeline to extract film data from Wikidata and prepare it for Machine Learning.
 
-The data engineering workflow is divided into three concrete phases.
+## Folder Structure
+- `data/`: Raw data from Wikidata (JSON/JSONL).
+- `outputs/`: Final ML-ready datasets (CSV).
+- `*.py`: The 5 sequential steps of the pipeline.
 
----
+## How to run
+Execute the scripts in order:
 
-## Phase 1: Film ID Collection & Error Mitigation
+1. `python 01_collect_movie_ids.py`: Gathers film Q-IDs for 2011-2026.
+2. `python 02_fetch_movie_features.py`: Fetches targeted features (Genre, Director, Cast, etc.).
+3. `python 03_fetch_prestige_data.py`: Fetches Oscar history for all talent.
+4. `python 04_build_final_dataset.py`: Integrates everything into a clean CSV.
+5. `python 05_run_analysis.py`: Performs statistical analysis for RQ1.
 
-The first step was building a baseline dataset of all relevant film entities. We queried the Wikidata SPARQL endpoint to find items matching specific semantic criteria:
-
-* **Target Criteria:** Items must be an instance of a film (`wdt:P31 wd:Q11424`) and possess a valid publication date (`wdt:P577`).
-* **Pipeline Challenges:** Requesting an entire year of global cinema caused severe server strain, resulting in HTTP 429 (Rate Limit Hit) and HTTP 502 (Bad Gateway) timeouts.
-* **The Solution:** We deployed a Python patch script that isolated the broken years (2013 and 2018) and queried them in smaller, monthly increments.
-
-By sub-dividing the workload into 12 monthly chunks, the query size dropped significantly, bypassing server timeouts. The script combined, deduplicated, and validated the records, saving a finalized list of approximately 75,000 unique film Q-IDs into `movie_ids_2011_2026.json`.
+## Key Features in Final Dataset
+- `target_oscar_nom`: Binary (1 = Academy Award nomination/win).
+- `director_prestige`: Number of previous Oscar nominations/wins for the director.
+- `cast_prestige`: Combined Oscar history for the top 5 cast members.
+- `month`: Release month (useful for Oscar Bait timing analysis).
+- `genre_*`: Binary flags for the top 20 most frequent genres.
