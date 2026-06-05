@@ -8,6 +8,9 @@ def analyze():
         print("❌ Error: Dataset missing.")
         return
     df = pd.read_csv(INPUT_CSV)
+
+    # print number of rows and columns
+    print(f"Dataset shape: {df.shape}")
     
     # 1. Target distribution
     nom = df['target_oscar_nom'].sum()
