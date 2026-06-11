@@ -9,8 +9,8 @@ HEADERS = {
     'User-Agent': 'OscarBaitResearch/2.0 (simone@domain.edu)',
     'Accept': 'application/json'
 }
-START_YEAR = 2011
-END_YEAR = 2026
+START_YEAR = 2023
+END_YEAR = 2023
 OUTPUT_FILE = "data/movie_ids.json"
 
 def collect():
@@ -30,6 +30,12 @@ def collect():
           ?film wdt:P31 wd:Q11424.
           ?film wdt:P577 ?releaseDate.
           FILTER(YEAR(?releaseDate) = {year})
+          
+          # Filter for USA or European countries
+          ?film wdt:P495 ?country.
+          ?country (wdt:P30*) ?continent.
+          
+          FILTER(?country = wd:Q30 || ?continent = wd:Q46)
         }}
         """
         try:
@@ -37,6 +43,8 @@ def collect():
             if response.status_code == 200:
                 results = response.json().get('results', {}).get('bindings', [])
                 year_ids = [item['film']['value'].split('/')[-1] for item in results]
+                print(f" -> Retrieved {len(year_ids)} films for {year}.")   
+                print(f" -> First 5: {year_ids[:5]}")
                 all_movie_ids.extend(year_ids)
                 print(f" -> Found {len(year_ids)} films.")
             else:
@@ -48,7 +56,7 @@ def collect():
     all_movie_ids = list(set(all_movie_ids))
     with open(OUTPUT_FILE, "w") as f:
         json.dump(all_movie_ids, f)
-    print(f"✅ Saved {len(all_movie_ids)} unique IDs to {OUTPUT_FILE}")
+    print(f"Saved {len(all_movie_ids)} unique IDs to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     collect()

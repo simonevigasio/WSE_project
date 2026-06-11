@@ -69,7 +69,7 @@ def build():
         df[f"genre_{g.replace(' ', '_')}"] = df["genres"].apply(lambda x: 1 if g in x else 0)
     df.drop(columns=["genres"], inplace=True)
     df.to_csv(OUTPUT_CSV, index=False)
-    print(f"✅ Final dataset saved to {OUTPUT_CSV} ({len(df)} rows).")
+    print(f"Final dataset saved to {OUTPUT_CSV} ({len(df)} rows).")
 
 if __name__ == "__main__":
     build()

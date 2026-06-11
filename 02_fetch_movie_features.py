@@ -32,7 +32,7 @@ def parse_snak_value(datavalue):
 def fetch():
     print("--- Step 2: Fetching Targeted Movie Features ---")
     if not os.path.exists(INPUT_FILE):
-        print(f"❌ Error: {INPUT_FILE} missing.")
+        print(f"Error: {INPUT_FILE} missing.")
         return
 
     with open(INPUT_FILE, "r") as f:
@@ -69,7 +69,7 @@ def fetch():
             except Exception as e:
                 print(f"Error: {e}")
                 time.sleep(5)
-    print("✅ Movie features fetched.")
+    print("Movie features fetched.")
 
 if __name__ == "__main__":
     fetch()

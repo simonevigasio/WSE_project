@@ -9,7 +9,7 @@ def fetch_prestige():
     print("--- Step 3: Fetching Talent Prestige Data (Oscars) ---")
     
     # 1. Get Oscar Categories
-    print("🚀 Fetching Oscar categories...")
+    print("Fetching Oscar categories...")
     query_cats = "SELECT ?award WHERE { ?award wdt:P31 wd:Q19020. }"
     resp = requests.get(SPARQL_URL, params={'format': 'json', 'query': query_cats}, headers=HEADERS)
     if resp.status_code != 200: return
@@ -43,7 +43,7 @@ def fetch_prestige():
         time.sleep(1)
 
     with open("data/talent_prestige.json", "w") as f: json.dump(prestige_map, f, indent=4)
-    print(f"✅ Saved prestige data for {len(prestige_map)} people.")
+    print(f"Saved prestige data for {len(prestige_map)} people.")
 
 if __name__ == "__main__":
     fetch_prestige()
