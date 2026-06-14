@@ -26,6 +26,10 @@ def fetch_prestige():
         query_people = f"""
         SELECT DISTINCT ?person ?award ?date WHERE {{
           VALUES ?award {{ {award_filter} }}
+
+          # Force the entity to be a human being
+          ?person wdt:P31 wd:Q5.
+          
           {{ ?person p:P166 [ps:P166 ?award; pq:P585 ?date]. }}
           UNION
           {{ ?person p:P1411 [ps:P1411 ?award; pq:P585 ?date]. }}
