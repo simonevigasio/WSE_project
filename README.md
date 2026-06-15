@@ -31,7 +31,8 @@ Execute these scripts in order to build the dataset from scratch:
 - **Action**: 
     - Merges movie features with English labels.
     - **Calculates Prestige**: Counts previous Oscars/nominations for directors and cast *strictly before* the movie's release year.
-    - **Temporal Engineering**: Extracts release month and year.
+    - **Temporal Engineering**: Extracts release year and month (uses "Unknown_month" for missing months).
+    - **Data Imputation**: Fills missing durations with the **genre-specific median** and missing languages with the **global mode**.
     - **One-Hot Encoding**: Creates binary flags for the top 20 most frequent genres.
 - **Output**: 
     - `outputs/final_dataset_with_financials.csv`: Raw sparse financials.
@@ -43,7 +44,8 @@ Execute these scripts in order to build the dataset from scratch:
 
 ### 7. `07_run_analysis.py`
 - **Goal**: Statistical Validation.
-- **Action**: Calculates correlations between engineered features and the target variable, providing immediate insights for RQ1.
+- **Action**: Calculates correlations and nomination rates specifically for the `final_dataset_with_financial_flag.csv` version. Generates visual plots for financial impact, top correlations, and monthly trends.
+- **Output**: Visualizations in `outputs/plots/`.
 
 ---
 
@@ -81,6 +83,9 @@ The following Wikidata properties are extracted and processed:
 - **cast_prestige**: Cumulative count of Oscar nominations/wins for the top 5 cast members *before* the current movie.
 - **is_adaptation**: Binary flag (1 if movie is based on existing work).
 - **genre_X**: Binary flags for the top 20 genres (One-Hot Encoding).
+- **duration (imputed)**: Missing values filled using the median runtime of the movie's primary genre.
+- **original_language (imputed)**: Missing values filled using the most frequent language in the dataset.
+- **has_financial_data**: (Flag version only) Binary indicator of whether budget or box office data was available.
 
 ---
 
