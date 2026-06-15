@@ -1,9 +1,10 @@
 import pandas as pd
+import os
 
 INPUT_CSV = "outputs/final_dataset.csv"
 
 def analyze():
-    print("--- Step 5: Final Results Analysis ---")
+    print("--- Step 7: Final Results Analysis ---")
     if not os.path.exists(INPUT_CSV):
         print("Error: Dataset missing.")
         return
@@ -28,5 +29,4 @@ def analyze():
     print(monthly)
 
 if __name__ == "__main__":
-    import os
     analyze()

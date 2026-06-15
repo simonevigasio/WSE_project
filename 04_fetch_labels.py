@@ -9,7 +9,7 @@ API_URL = "https://www.wikidata.org/w/api.php"
 HEADERS = {'User-Agent': 'OscarBaitResearch/2.0 (simone@domain.edu)'}
 
 def fetch_labels():
-    print("--- Step 3: Resolving English Labels for All Extracted Entities ---")
+    print("--- Step 4: Resolving English Labels for All Extracted Entities ---")
     
     if not os.path.exists(RAW_MOVIES):
         print(f"Error: {RAW_MOVIES} missing. Run step 2 first.")
