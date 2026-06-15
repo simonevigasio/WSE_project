@@ -1,9 +1,10 @@
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 FILES_TO_ANALYZE = [
-    "outputs/final_dataset_with_financials.csv",
-    "outputs/final_dataset_with_financial_flag.csv"
+    "outputs/final_dataset.csv"
 ]
 
 def analyze_nulls():
@@ -32,13 +33,10 @@ def analyze_nulls():
         null_df = null_df[null_df['Null Count'] > 0].sort_values(by='Null Count', ascending=False)
         
         if null_df.empty:
-            print("Status: SUCCESS! No NULL values found in this version.")
+            print("Status: SUCCESS! No NULL values found in the dataset.")
         else:
             print("Missing Data Summary:")
             print(null_df.to_string(index=False))
-            
-            if "budget" in null_df['Column'].values:
-                print("\nNote: High missingness in financial data is common in Wikidata.")
 
 if __name__ == "__main__":
     analyze_nulls()

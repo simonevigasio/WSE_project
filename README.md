@@ -31,21 +31,19 @@ Execute these scripts in order to build the dataset from scratch:
 - **Action**: 
     - Merges movie features with English labels.
     - **Calculates Prestige**: Counts previous Oscars/nominations for directors and cast *strictly before* the movie's release year.
-    - **Temporal Engineering**: Extracts release year and month (uses "Unknown_month" for missing months).
-    - **Data Imputation**: Fills missing durations with the **genre-specific median** and missing languages with the **global mode**.
-    - **One-Hot Encoding**: Creates binary flags for the top 20 most frequent genres.
-- **Output**: 
-    - `outputs/final_dataset_with_financials.csv`: Raw sparse financials.
-    - `outputs/final_dataset_with_financial_flag.csv`: Replaces financials with a binary `has_financial_data` flag (Zero NULLs).
+    - **Temporal Engineering**: Extracts release year and month (uses "Unknown_month" for missing months from the earliest release).
+    - **One-Hot Encoding**: Creates binary flags for the top 20 most frequent **genres, countries, languages, and production companies**, as well as **release months**, to handle categorical data and multi-value entries (e.g., co-productions).
+    - **Data Imputation**: Fills missing durations with the **genre-specific median**.
+- **Output**: `outputs/final_dataset.csv` (Zero NULLs).
 
 ### 6. `06_null_value_analysis.py`
 - **Goal**: Quality Control.
-- **Action**: Analyzes both versions of the final dataset for missing values (NULLs), verifying data completeness.
+- **Action**: Analyzes the final dataset for missing values (NULLs), verifying data completeness.
 
 ### 7. `07_run_analysis.py`
-- **Goal**: Statistical Validation.
-- **Action**: Calculates correlations and nomination rates specifically for the `final_dataset_with_financial_flag.csv` version. Generates visual plots for financial impact, production company performance, top correlations, and monthly trends.
-- **Output**: Visualizations in `outputs/plots/` (including `studio_impact.png`).
+- **Goal**: Feature Frequency Analysis.
+- **Action**: Analyzes the frequency of binary features (genres, countries, languages, studios, months) within the `final_dataset.csv`. It identifies which features are most common and provides a summary by category.
+- **Output**: `outputs/binary_feature_frequencies.csv` containing counts and percentages for all engineered binary features.
 
 ---
 
@@ -64,8 +62,8 @@ The following Wikidata properties are extracted and processed:
 | **P161** | `cast_member` | Actors/Performers. | Foundation for **Cast Prestige** (Top 5 billed actors). |
 | **P272** | `production_company`| Studio/Producer. | Identifies powerhouses like A24 or Searchlight. |
 | **P2047** | `duration` | Length in minutes. | Explores the "epic" length vs. nomination probability. |
-| **P2130** | `cost` | Production budget. | Correlates financial investment with critical recognition. |
-| **P2142** | `box_office` | Total revenue. | Explores the relationship between commercial success and awards. |
+| **P2130** | `cost` | Production budget. | Foundation for the `has_financial_data` flag. |
+| **P2142** | `box_office` | Total revenue. | Foundation for the `has_financial_data` flag. |
 | **P495** | `country_of_origin` | Production country. | Useful for International Feature Film analysis. |
 | **P364** | `original_language` | Primary language. | Categorizes foreign language contenders. |
 | **P144** | `based_on` | Source material. | Identifies **Adaptations** (books, plays), a staple of Oscar bait. |
@@ -82,17 +80,20 @@ The following Wikidata properties are extracted and processed:
 - **director_prestige**: Cumulative count of Oscar nominations/wins the director had *before* the current movie.
 - **cast_prestige**: Cumulative count of Oscar nominations/wins for the top 5 cast members *before* the current movie.
 - **is_adaptation**: Binary flag (1 if movie is based on existing work).
-- **genre_X**: Binary flags for the top 20 genres (One-Hot Encoding).
-- **duration (imputed)**: Missing values filled using the median runtime of the movie's primary genre.
-- **original_language (imputed)**: Missing values filled using the most frequent language in the dataset.
-- **has_financial_data**: (Flag version only) Binary indicator of whether budget or box office data was available.
+- **has_financial_data**: Binary indicator of whether budget or box office data was available (original values are dropped to maintain a clean dataset).
+- **month_X**: Binary flags for each release month (1-12 and `unknown`).
+- **genre_X**: Binary flags for the top 20 genres (includes `genre_other_or_unknown`).
+- **country_X**: Binary flags for the top 20 countries of origin (includes `country_other_or_unknown`).
+- **lang_X**: Binary flags for the top 20 original languages (includes `lang_other_or_unknown`).
+- **studio_X**: Binary flags for the top 20 production companies (includes `studio_other_or_unknown`).
+- **duration**: Missing values are imputed using the average of the medians of the movie's genres. If no genre data is available, the global median is used.
 
 ---
 
 ## 📂 Project Structure
 - `data/`: Intermediate JSON/JSONL files (Raw Wikidata dumps).
-- `outputs/`: Final ML-ready CSV files.
-    - `final_dataset_with_financials.csv` (Raw numeric financials)
-    - `final_dataset_with_financial_flag.csv` (Binary financial flag)
+- `outputs/`: Final ML-ready CSV files and analysis reports.
+    - `final_dataset.csv` (Fully processed, zero NULLs)
+    - `binary_feature_frequencies.csv` (Summary of engineered feature occurrences)
 - `*.py`: Sequential pipeline scripts (01 to 07).
 - `README.md`: Project documentation.

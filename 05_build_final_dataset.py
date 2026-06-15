@@ -9,8 +9,7 @@ PRESTIGE_DATA = "data/talent_prestige.json"
 OSCAR_CATEGORIES = "data/oscar_categories.json"
 LABELS_MAP = "data/wikidata_english_labels.json"
 
-OUTPUT_FINANCIALS = "outputs/final_dataset_with_financials.csv"
-OUTPUT_FLAG = "outputs/final_dataset_with_financial_flag.csv"
+OUTPUT_FINAL = "outputs/final_dataset.csv"
 
 # --- Helper Functions ---
 
@@ -27,12 +26,11 @@ def load_json_resources():
 
 def extract_release_date(release_dates):
     """
-    Extracts the earliest valid year and month from a list of Wikidata time strings.
-    Returns (year, month) where month can be 'Unknown_month'.
+    Extracts the year and month from the earliest valid Wikidata time string.
+    Returns (year, month) where month can be 'unknown'.
     """
-    year, month = None, None
     if not isinstance(release_dates, list):
-        return None, "Unknown_month"
+        return None, "unknown"
 
     # Sort dates to evaluate the chronologically earliest ones first
     clean_dates = sorted([d for d in release_dates if d and isinstance(d, str)])
@@ -45,31 +43,25 @@ def extract_release_date(release_dates):
             
             # Filter for the relevant study period (2011-2026)
             if 2011 <= potential_year <= 2026:
-                year = potential_year
-                # If we find a valid month, we are done. Otherwise, keep looking for a better date.
-                if 1 <= potential_month <= 12:
-                    month = potential_month
-                    break 
+                # We found the earliest valid date. Use it and stop.
+                month = potential_month if 1 <= potential_month <= 12 else "unknown"
+                return potential_year, month
         except (ValueError, IndexError):
             continue
             
-    return year, (month if month else "Unknown_month")
+    return None, "unknown"
 
 def calculate_prestige(talent_ids, reference_year, prestige_map):
-    """
-    Calculates cumulative Oscar prestige (wins/noms) for a list of talent IDs 
-    strictly BEFORE the movie's release year to prevent data leakage.
-    """
+    """Calculates cumulative Oscar prestige (wins/noms) strictly BEFORE the movie's release year."""
     total_prestige = 0
     for t_id in talent_ids:
         if t_id in prestige_map:
-            # Count events where the award year is less than the movie release year
             total_prestige += sum(1 for event in prestige_map[t_id] 
                                  if event.get('year') and int(event['year']) < reference_year)
     return total_prestige
 
 def clean_numeric(val):
-    """Safely converts Wikidata numeric strings (e.g. '+15000000') to floats."""
+    """Safely converts Wikidata numeric strings to floats."""
     if val is None: return None
     try:
         return float(str(val).lstrip("+"))
@@ -89,6 +81,9 @@ def build():
 
     rows = []
     genre_counter = Counter()
+    country_counter = Counter()
+    lang_counter = Counter()
+    studio_counter = Counter()
 
     with open(RAW_MOVIES, "r") as f:
         for line in f:
@@ -96,25 +91,30 @@ def build():
             movie = json.loads(line)
             q_id = movie["movie_id"]
             
-            # 1. Target Labeling (1 if nominated/won an Oscar)
+            # 1. Target Labeling
             awards_claims = movie.get("P1411", []) + movie.get("P166", [])
             target = 1 if any(cat in oscar_cats for cat in awards_claims) else 0
             
             # 2. Temporal Features
             year, month = extract_release_date(movie.get("P577", []))
-            if not year: continue # Skip movies outside our temporal scope
+            if not year: continue
 
-            # 3. Talent Prestige (Time-Aware)
+            # 3. Talent Prestige
             director_prestige = calculate_prestige(movie.get("P57", []), year, prestige_map)
             cast_prestige = calculate_prestige(movie.get("P161", [])[:5], year, prestige_map)
 
-            # 4. Categorical Feature Resolution
+            # 4. Multi-value Feature Resolution
             movie_genres = [labels.get(g_id, g_id) for g_id in movie.get("P136", [])]
             for g in movie_genres: genre_counter[g] += 1
 
-            studio_id = next(iter(movie.get("P272", [None])), None)
-            country_id = next(iter(movie.get("P495", [None])), None)
-            lang_id = next(iter(movie.get("P364", [None])), None)
+            movie_countries = [labels.get(c_id, c_id) for c_id in movie.get("P495", [])]
+            for c in movie_countries: country_counter[c] += 1
+
+            movie_langs = [labels.get(l_id, l_id) for l_id in movie.get("P364", [])]
+            for l in movie_langs: lang_counter[l] += 1
+
+            movie_studios = [labels.get(s_id, s_id) for s_id in movie.get("P272", [])]
+            for s in movie_studios: studio_counter[s] += 1
 
             # 5. Row Construction
             rows.append({
@@ -123,67 +123,87 @@ def build():
                 "year": year, 
                 "month": month,
                 "duration": clean_numeric(next(iter(movie.get("P2047", [None])), None)),
-                "budget": clean_numeric(next(iter(movie.get("P2130", [None])), None)),                        
-                "box_office": clean_numeric(next(iter(movie.get("P2142", [None])), None)),                
+                "budget_raw": clean_numeric(next(iter(movie.get("P2130", [None])), None)),                        
+                "box_office_raw": clean_numeric(next(iter(movie.get("P2142", [None])), None)),                
                 "is_adaptation": 1 if "P144" in movie else 0,
                 "director_prestige": director_prestige, 
                 "cast_prestige": cast_prestige,
-                "production_company": labels.get(studio_id, "Other") if studio_id else "Other",                       
-                "primary_country": labels.get(country_id) if country_id else None,
-                "original_language": labels.get(lang_id) if lang_id else None,
                 "genres": movie_genres, 
+                "countries": movie_countries,
+                "languages": movie_langs,
+                "studios": movie_studios,
                 "target_oscar_nom": target
             })
 
     if not rows:
-        print("No valid rows built. Check your data inputs.")
+        print("No valid rows built.")
         return
 
     df = pd.DataFrame(rows)
 
-    # --- Data Imputation Logic ---
-
-    # A. Runtime: Median per Genre (Fall back to Global Median)
-    df['primary_genre'] = df['genres'].apply(lambda x: x[0] if x else None)
-    genre_medians = df.groupby('primary_genre')['duration'].median()
+    # --- Data Imputation Logic: Duration ---
+    # We use all genres to estimate runtime. 
+    # 1. Flatten the dataframe to calculate medians for every individual genre
+    genre_duration_map = df.explode('genres').groupby('genres')['duration'].median().to_dict()
     global_median = df['duration'].median()
     
     def impute_duration(row):
-        if pd.notnull(row['duration']): return row['duration']
-        genre_val = genre_medians.get(row['primary_genre'])
-        if pd.notnull(genre_val): return genre_val
+        if pd.notnull(row['duration']): 
+            return row['duration']
+        
+        # If we have genres, take the average of their respective medians
+        movie_genres = row.get('genres', [])
+        if movie_genres:
+            genre_vals = [genre_duration_map.get(g) for g in movie_genres if pd.notnull(genre_duration_map.get(g))]
+            if genre_vals:
+                return sum(genre_vals) / len(genre_vals)
+        
+        # Fallback to global median if no genres or no data found
         return global_median
 
     df['duration'] = df.apply(impute_duration, axis=1)
-    df.drop(columns=['primary_genre'], inplace=True)
 
-    # B. Language: Mode Imputation
-    if not df['original_language'].mode().empty:
-        df['original_language'] = df['original_language'].fillna(df['original_language'].mode()[0])
+    # --- Binary Encoding for Multi-value Features ---
+    def encode_multi(dataframe, counter, column_name, prefix, top_n=20):
+        top_items = [item for item, _ in counter.most_common(top_n)]
+        top_items_set = set(top_items)
 
-    # --- Feature Encoding ---
+        # Binary flags for top N
+        for item in top_items:
+            clean_item = str(item).replace(' ', '_').replace('/', '_').replace('-', '_').replace('.', '')
+            dataframe[f"{prefix}_{clean_item}"] = dataframe[column_name].apply(lambda x: 1 if item in x else 0)
+        
+        # Binary flag for "Other or Unknown"
+        # Set to 1 if: 
+        # a) the list is empty (Unknown) 
+        # b) any item in the list is NOT in the top N (Other)
+        def check_other(vals):
+            if not vals: return 1
+            return 1 if any(v not in top_items_set for v in vals) else 0
+            
+        dataframe[f"{prefix}_other_or_unknown"] = dataframe[column_name].apply(check_other)
+        return dataframe
 
-    # One-hot encode the top 20 genres
-    top_genres = [g for g, _ in genre_counter.most_common(20)]
-    for g in top_genres:
-        col_name = f"genre_{g.replace(' ', '_')}"
-        df[col_name] = df["genres"].apply(lambda x: 1 if g in x else 0)
+    df = encode_multi(df, genre_counter, 'genres', 'genre')
+    df = encode_multi(df, country_counter, 'countries', 'country')
+    df = encode_multi(df, lang_counter, 'languages', 'lang')
+    df = encode_multi(df, studio_counter, 'studios', 'studio')
+
+    # --- One-Hot Encoding for Months ---
+    possible_months = [str(i) for i in range(1, 13)] + ['unknown']
+    for m in possible_months:
+        df[f"month_{m}"] = (df['month'].astype(str) == m).astype(int)
+
+    # --- Create Financial Flag & Final Clean ---
+    df['has_financial_data'] = (df['budget_raw'].notnull() | df['box_office_raw'].notnull()).astype(int)
     
-    df.drop(columns=["genres"], inplace=True)
+    # Drop intermediate and sparse columns
+    df.drop(columns=["genres", "countries", "languages", "studios", "budget_raw", "box_office_raw", "month"], inplace=True)
     
     # --- File Export ---
     os.makedirs("outputs", exist_ok=True)
-    
-    # Version 1: With Raw Financials (Sparse)
-    df.to_csv(OUTPUT_FINANCIALS, index=False)
-    print(f"Version 1 (Raw Financials) saved to {OUTPUT_FINANCIALS}")
-
-    # Version 2: With Financial Flag (Complete)
-    df_flag = df.copy()
-    df_flag['has_financial_data'] = (df_flag['budget'].notnull() | df_flag['box_office'].notnull()).astype(int)
-    df_flag.drop(columns=['budget', 'box_office'], inplace=True)
-    df_flag.to_csv(OUTPUT_FLAG, index=False)
-    print(f"Version 2 (Financial Flag) saved to {OUTPUT_FLAG}")
+    df.to_csv(OUTPUT_FINAL, index=False)
+    print(f"Final dataset saved to {OUTPUT_FINAL} ({len(df)} rows).")
 
 if __name__ == "__main__":
     build()
