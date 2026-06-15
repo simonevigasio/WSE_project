@@ -44,8 +44,8 @@ Execute these scripts in order to build the dataset from scratch:
 
 ### 7. `07_run_analysis.py`
 - **Goal**: Statistical Validation.
-- **Action**: Calculates correlations and nomination rates specifically for the `final_dataset_with_financial_flag.csv` version. Generates visual plots for financial impact, top correlations, and monthly trends.
-- **Output**: Visualizations in `outputs/plots/`.
+- **Action**: Calculates correlations and nomination rates specifically for the `final_dataset_with_financial_flag.csv` version. Generates visual plots for financial impact, production company performance, top correlations, and monthly trends.
+- **Output**: Visualizations in `outputs/plots/` (including `studio_impact.png`).
 
 ---
 
