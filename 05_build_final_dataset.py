@@ -184,10 +184,14 @@ def build():
         dataframe[f"{prefix}_other_or_unknown"] = dataframe[column_name].apply(check_other)
         return dataframe
 
-    df = encode_multi(df, genre_counter, 'genres', 'genre')
-    df = encode_multi(df, country_counter, 'countries', 'country')
-    df = encode_multi(df, lang_counter, 'languages', 'lang')
-    df = encode_multi(df, studio_counter, 'studios', 'studio')
+    df = encode_multi(df, genre_counter, 'genres', 'genre', top_n=35)
+    df = encode_multi(df, country_counter, 'countries', 'country', top_n=20)
+    df = encode_multi(df, lang_counter, 'languages', 'lang', top_n=20)
+    
+    # --- Studio Feature Engineering: Is Major Studio ---
+    top_studios = [item for item, _ in studio_counter.most_common(20)]
+    top_studios_set = set(top_studios)
+    df['is_major_studio'] = df['studios'].apply(lambda x: 1 if any(s in top_studios_set for s in x) else 0)
 
     # --- One-Hot Encoding for Months ---
     possible_months = [str(i) for i in range(1, 13)] + ['unknown']
