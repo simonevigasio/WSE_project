@@ -4,7 +4,7 @@ import os
 from collections import Counter
 
 # --- Configuration & Paths ---
-RAW_MOVIES = "data/raw_movies.jsonl"
+RAW_MOVIES = "data/eligible_raw_movies.jsonl"
 PRESTIGE_DATA = "data/talent_prestige.json"
 OSCAR_CATEGORIES = "data/oscar_categories.json"
 LABELS_MAP = "data/wikidata_english_labels.json"

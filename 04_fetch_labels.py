@@ -3,7 +3,7 @@ import os
 import requests
 import time
 
-RAW_MOVIES = "data/raw_movies.jsonl"
+RAW_MOVIES = "data/eligible_raw_movies.jsonl"
 OUTPUT_LABELS = "data/wikidata_english_labels.json"
 API_URL = "https://www.wikidata.org/w/api.php"
 HEADERS = {'User-Agent': 'OscarBaitResearch/2.0 (simone@domain.edu)'}

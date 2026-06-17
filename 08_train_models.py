@@ -12,7 +12,7 @@ import os
 
 # --- Configuration ---
 INPUT_CSV = "outputs/final_dataset.csv"
-OUTPUT_PLOT = "outputs/plots/final_cv_metrics.png"
+OUTPUT_PLOT = "outputs/plots/final_filtered_cv_metrics.png"
 N_SPLITS = 10
 THRESHOLDS = np.linspace(0.01, 0.99, 50) 
 
