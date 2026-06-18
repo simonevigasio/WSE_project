@@ -4,7 +4,7 @@ import os
 from collections import Counter
 
 # --- Configuration & Paths ---
-RAW_MOVIES = "data/eligible_raw_movies.jsonl"
+RAW_MOVIES = "data/raw_movies.jsonl"
 PRESTIGE_DATA = "data/talent_prestige.json"
 OSCAR_CATEGORIES = "data/oscar_categories.json"
 LABELS_MAP = "data/wikidata_english_labels.json"
@@ -12,6 +12,59 @@ LABELS_MAP = "data/wikidata_english_labels.json"
 OUTPUT_FINAL = "outputs/final_dataset.csv"
 
 # --- Helper Functions ---
+
+def check_eligibility(movie):
+    """
+    Evaluates a movie based ONLY on properties present in the SPARQL dump.
+    Returns (True, "Pass") or (False, "Reason for failure").
+    """
+    # 1. Sub-type Exclusions (P31 / P279)
+    # Q501311 = TV Movie, Q24862 = Short Film, Q7889 = Video Game Q506240
+    instances = movie.get('P31', []) + movie.get('P279', [])
+    invalid_types = {'Q501311', 'Q24862', 'Q7889'}
+    if any(t in invalid_types for t in instances):
+        return False, "Failed: Is a TV Movie/Short/Game"
+        
+    # 2. Genre Exclusions (P136)
+    # Q561136 = Pornographic film, Q505809 = Adult film
+    genres = movie.get('P136', [])
+    invalid_genres = {'Q561136', 'Q505809'}
+    if any(g in invalid_genres for g in genres):
+        return False, "Failed: Adult Genre"
+
+    # 3. Runtime Gate (P2047)
+    runtimes = movie.get('P2047', [])
+    if runtimes:
+        has_valid_runtime = False
+        for r in runtimes:
+            try:
+                # Strip the '+' sign and convert to float
+                val = float(r.replace('+', ''))
+                if val > 40:
+                    has_valid_runtime = True
+                    break
+            except ValueError:
+                continue
+        
+        # If runtimes are listed but NONE are > 40, it's a short film
+        if not has_valid_runtime:
+            return False, "Failed: Runtime under 40 mins"
+
+    # 4. Country of Origin Gate (P495)
+    countries = movie.get('P495', [])
+    if countries: 
+        top_nations = {'Q30', 'Q145', 'Q142', 'Q183', 'Q38', 'Q408', 'Q16', 'Q884', 'Q96'}
+        if not any(c in top_nations for c in countries):
+            return False, "Failed: Outside Top 9 Nations"
+
+    # 5. Commercial Proxy (Must have either a budget, box office, or known studio)
+    has_budget = 'P2130' in movie
+    has_box_office = 'P2142' in movie
+    has_studio = 'P272' in movie
+    if not (has_budget or has_box_office or has_studio):
+        return False, "Failed: No Commercial Footprint (No Studio/Budget/Box Office)"
+
+    return True, "Pass"
 
 def load_json_resources():
     """Load all necessary JSON mapping files."""
@@ -84,12 +137,22 @@ def build():
     country_counter = Counter()
     lang_counter = Counter()
     studio_counter = Counter()
+    
+    total_processed = 0
+    drop_reasons = Counter()
 
     with open(RAW_MOVIES, "r") as f:
         for line in f:
             if not line.strip(): continue
+            total_processed += 1
             movie = json.loads(line)
             q_id = movie["movie_id"]
+            
+            # --- Eligibility Check (Merged from Step 2b) ---
+            is_eligible, reason = check_eligibility(movie)
+            if not is_eligible:
+                drop_reasons[reason] += 1
+                continue
             
             # 1. Target Labeling
             awards_claims = movie.get("P1411", []) + movie.get("P166", [])
@@ -97,7 +160,9 @@ def build():
             
             # 2. Temporal Features
             year, month = extract_release_date(movie.get("P577", []))
-            if not year: continue
+            if not year: 
+                drop_reasons["Failed: No valid release year"] += 1
+                continue
 
             # 3. Talent Prestige
             director_prestige = calculate_prestige(movie.get("P57", []), year, prestige_map)
@@ -134,6 +199,13 @@ def build():
                 "studios": movie_studios,
                 "target_oscar_nom": target
             })
+
+    print(f"Total Raw Movies: {total_processed}")
+    print(f"Total Eligible: {len(rows)}")
+    if drop_reasons:
+        print("--- Drop Reasons ---")
+        for reason, count in drop_reasons.most_common():
+            print(f" - {count} films -> {reason}")
 
     if not rows:
         print("No valid rows built.")
@@ -185,8 +257,8 @@ def build():
         return dataframe
 
     df = encode_multi(df, genre_counter, 'genres', 'genre', top_n=35)
-    df = encode_multi(df, country_counter, 'countries', 'country', top_n=20)
-    df = encode_multi(df, lang_counter, 'languages', 'lang', top_n=20)
+    df = encode_multi(df, country_counter, 'countries', 'country', top_n=10)
+    df = encode_multi(df, lang_counter, 'languages', 'lang', top_n=10)
     
     # --- Studio Feature Engineering: Is Major Studio ---
     top_studios = [item for item, _ in studio_counter.most_common(20)]

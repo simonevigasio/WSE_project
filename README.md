@@ -27,8 +27,9 @@ Execute these scripts in order to build the dataset from scratch:
 - **Output**: `data/wikidata_english_labels.json`
 
 ### 5. `05_build_final_dataset.py`
-- **Goal**: Data Integration & Feature Engineering.
+- **Goal**: Data Integration, Filtering & Feature Engineering.
 - **Action**: 
+    - **Filters Eligibility**: Discards TV movies, short films, adult films, and films lacking commercial proxies (budget/box office/studio).
     - Merges movie features with English labels.
     - **Calculates Prestige**: Counts previous Oscars/nominations for directors and cast *strictly before* the movie's release year.
     - **Temporal Engineering**: Extracts release year and month (uses "Unknown_month" for missing months from the earliest release).
