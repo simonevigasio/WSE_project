@@ -15,9 +15,9 @@ def check_eligibility(movie):
         return False, "Failed: Is a TV Movie/Short/Game"
         
     # 2. Genre Exclusions (P136)
-    # Q561136 = Pornographic film, Q505809 = Adult film
+    # Q185529 = Pornographic film, Q732004 = Adult film
     genres = movie.get('P136', [])
-    invalid_genres = {'Q561136', 'Q505809'}
+    invalid_genres = {'Q185529', 'Q732004'}
     if any(g in invalid_genres for g in genres):
         return False, "Failed: Adult Genre"
 

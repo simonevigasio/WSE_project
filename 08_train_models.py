@@ -131,8 +131,10 @@ def run_comprehensive_cv():
         plt.plot(THRESHOLDS, mean_prec, label='Precision', color='blue')
         plt.plot(THRESHOLDS, mean_rec, label='Recall', color='green')
         plt.plot(THRESHOLDS, mean_f1, label='F1 Score', color='red', linestyle='--')
-        
-        best_t = THRESHOLDS[np.argmax(mean_f1)]
+
+        best_idx = int(np.argmax(mean_f1))
+        best_t = THRESHOLDS[best_idx]
+        print(f"{m_name} - Best threshold: {best_t:.2f}, Precision: {mean_prec[best_idx]:.3f}, Recall: {mean_rec[best_idx]:.3f}, F1: {mean_f1[best_idx]:.3f}")
         plt.axvline(best_t, color='gray', alpha=0.5, linestyle=':', label=f'Best F1 (T={best_t:.2f})')
         
         plt.title(f"{m_name}\nAvg {N_SPLITS}-Fold Metrics")

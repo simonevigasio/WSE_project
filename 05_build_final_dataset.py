@@ -100,7 +100,7 @@ def build():
 
             # 3. Talent Prestige
             director_prestige = calculate_prestige(movie.get("P57", []), year, prestige_map)
-            cast_prestige = calculate_prestige(movie.get("P161", [])[:5], year, prestige_map)
+            cast_prestige = calculate_prestige(movie.get("P161", []), year, prestige_map)
 
             # 4. Multi-value Feature Resolution
             movie_genres = [labels.get(g_id, g_id) for g_id in movie.get("P136", [])]
