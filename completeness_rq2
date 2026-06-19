@@ -1,0 +1,135 @@
+import json
+import os
+import pandas as pd
+import networkx as nx
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import mannwhitneyu
+
+def analyze_graph_completeness(jsonl_path, csv_path, plot_out_path):
+    print("--- RQ2: KNOWLEDGE GRAPH TOPOLOGY ANALYSIS ---")
+    
+    # 1. Load the Ground Truth Labels
+    print(f"Loading labels from {csv_path}...")
+    df = pd.read_csv(csv_path)
+    # Create a fast lookup dictionary: movie_id -> target_oscar_nom
+    label_map = dict(zip(df['movie_id'], df['target_oscar_nom']))
+    print(f"Loaded {len(label_map)} labels.")
+
+    # 2. Build the Directed Graph
+    print(f"Building Directed Graph from {jsonl_path}...")
+    G = nx.DiGraph()
+    
+    nodes_added = 0
+    edges_added = 0
+    
+    with open(jsonl_path, 'r') as f:
+        for line in f:
+            if not line.strip(): continue
+            
+            movie = json.loads(line)
+            m_id = movie['movie_id']
+            
+            # Add the central movie node
+            G.add_node(m_id, type='Movie')
+            nodes_added += 1
+            
+            # Iterate through all properties (P-IDs)
+            for key, values in movie.items():
+                if key.startswith('P') and isinstance(values, list):
+                    for val in values:
+                        # Create a directed edge from the Movie to the Property Value
+                        # E.g., (Movie) --[P161: Cast Member]--> (Actor)
+                        G.add_edge(m_id, str(val), property=key)
+                        edges_added += 1
+                        
+    print(f"Graph Built: {nodes_added} Movie Nodes, {edges_added} Total Property Edges.")
+
+    # 3. Calculate Node Out-Degree (Graph Density)
+    print("\nCalculating Toplogical Density (Out-Degree)...")
+    nom_degrees = []
+    non_nom_degrees = []
+    
+    for m_id, label in label_map.items():
+        if G.has_node(m_id):
+            # out_degree represents the total number of populated properties/connections
+            degree = G.out_degree(m_id) 
+            if label == 1:
+                nom_degrees.append(degree)
+            else:
+                non_nom_degrees.append(degree)
+                
+    # 4. Statistical Testing
+    print("\n--- AXIS B: Entity Density (Total Populated Edges) ---")
+    
+    # Convert to pandas series for easy median calculation
+    s_nom = pd.Series(nom_degrees)
+    s_non_nom = pd.Series(non_nom_degrees)
+    
+    print(f"Median Out-Degree (Nominated):     {s_nom.median():.1f} edges")
+    print(f"Median Out-Degree (Non-Nominated): {s_non_nom.median():.1f} edges")
+    
+    # Mann-Whitney U Test
+    # Tests if the nominated distribution is stochastically greater than the non-nominated
+    stat, p_val = mannwhitneyu(nom_degrees, non_nom_degrees, alternative='two-sided')
+    
+    print(f"Mann-Whitney U Statistic: {stat:.2f}")
+    print(f"P-Value: {p_val:.2e} " + ("(Significant!)" if p_val < 0.05 else "(Not Significant)"))
+
+    # 5. Visualization
+    print("\nGenerating Density Visualization...")
+    os.makedirs(os.path.dirname(plot_out_path), exist_ok=True)
+    
+    plt.figure(figsize=(10, 6))
+    sns.set_theme(style="whitegrid")
+
+    non_nom_color = '#4C78A8'
+    nom_color = '#F58518'
+    
+    # Plot KDE (Kernel Density Estimate) for both distributions
+    sns.kdeplot(
+        non_nom_degrees,
+        fill=True,
+        color=non_nom_color,
+        label='Non-Nominated',
+        alpha=0.55,
+        bw_adjust=0.8,
+    )
+    sns.kdeplot(
+        nom_degrees,
+        fill=True,
+        color=nom_color,
+        label='Oscar Nominated',
+        alpha=0.55,
+        bw_adjust=0.8,
+    )
+    
+    # Formatting
+    plt.title("Wikidata Graph Completeness: Node Out-Degree Distribution", fontsize=15, pad=15)
+    plt.xlabel("Total Property Edges per Film (Node Out-Degree)", fontsize=12)
+    plt.ylabel("Density (Frequency)", fontsize=12)
+    plt.xlim(0, max(max(nom_degrees), max(non_nom_degrees)) + 10) # Clip x-axis to max degree
+    plt.legend(fontsize=12)
+    
+    # Add a vertical line showing the medians
+    plt.axvline(s_non_nom.median(), color=non_nom_color, linestyle='--', alpha=0.8)
+    plt.axvline(s_nom.median(), color=nom_color, linestyle='--', alpha=0.8)
+    plt.text(s_non_nom.median() + 2, plt.ylim()[1]*0.9, f"Median: {s_non_nom.median():.0f}", color=non_nom_color)
+    plt.text(s_nom.median() + 2, plt.ylim()[1]*0.8, f"Median: {s_nom.median():.0f}", color=nom_color)
+
+    plt.tight_layout()
+    plt.savefig(plot_out_path, dpi=300)
+    plt.close()
+    
+    print(f"SUCCESS: Graph density visualization saved to '{plot_out_path}'.")
+
+if __name__ == "__main__":
+    # Define file paths based on the project structure
+    JSONL_PATH = "data/eligible_raw_movies.jsonl"
+    CSV_PATH = "outputs/final_dataset.csv"
+    PLOT_OUT = "outputs/plots/rq2_networkx_density.png"
+    
+    if os.path.exists(JSONL_PATH) and os.path.exists(CSV_PATH):
+        analyze_graph_completeness(JSONL_PATH, CSV_PATH, PLOT_OUT)
+    else:
+        print("Error: Missing input files. Ensure data/eligible_raw_movies.jsonl and outputs/final_dataset.csv exist.")
