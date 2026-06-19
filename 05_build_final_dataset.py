@@ -8,7 +8,6 @@ RAW_MOVIES = "data/eligible_raw_movies.jsonl"
 PRESTIGE_DATA = "data/talent_prestige.json"
 OSCAR_CATEGORIES = "data/oscar_categories.json"
 LABELS_MAP = "data/wikidata_english_labels.json"
-
 OUTPUT_FINAL = "outputs/final_dataset.csv"
 
 # --- Helper Functions ---
@@ -116,7 +115,7 @@ def build():
             movie_studios = [labels.get(s_id, s_id) for s_id in movie.get("P272", [])]
             for s in movie_studios: studio_counter[s] += 1
 
-            # 5. Row Construction
+            # 5. Row Construction (Added Tropes Here!)
             rows.append({
                 "movie_id": q_id, 
                 "title": labels.get(q_id, q_id), 
@@ -125,7 +124,8 @@ def build():
                 "duration": clean_numeric(next(iter(movie.get("P2047", [None])), None)),
                 "budget_raw": clean_numeric(next(iter(movie.get("P2130", [None])), None)),                        
                 "box_office_raw": clean_numeric(next(iter(movie.get("P2142", [None])), None)),                
-                "is_adaptation": 1 if "P144" in movie else 0,
+                "is_adaptation": 1 if "P144" in movie else 0,          # P144 = based on
+                "is_biopic_or_history": 1 if "P921" in movie else 0,   # P921 = main subject
                 "director_prestige": director_prestige, 
                 "cast_prestige": cast_prestige,
                 "genres": movie_genres, 

@@ -11,7 +11,7 @@ CORE_PROPERTIES = {
     "P161": "cast_member", "P272": "production_company", "P2047": "duration",
     "P2142": "box_office", "P495": "country_of_origin", "P364": "original_language",
     "P144": "based_on", "P1411": "nominated_for", "P166": "award_received", 
-    "P2130": "cost"
+    "P2130": "cost", "P921": "main_subject"
 }
 
 INPUT_FILE = "data/movie_ids.json"
